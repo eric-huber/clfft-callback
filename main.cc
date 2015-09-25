@@ -92,8 +92,8 @@ int main(int ac, char* av[]) {
     count = ((int) ceil(count / parallel)) * parallel;
 
     // test it
-    FftTest test(fft_size, device, count, parallel, test_data, mean, std);
-    test.init();
+    FftTest test;
+    test.init(fft_size, device, count, parallel, test_data, mean, std);
     test.test();
     test.release();
     

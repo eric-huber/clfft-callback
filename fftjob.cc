@@ -1,0 +1,132 @@
+#include "fftjob.hh"
+
+#include <ctime>
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <random>
+#include <math.h>
+
+FftJob::FftJob(size_t size) 
+ : _size(size)
+{
+    _data  = new cl_float[_size];
+}
+
+
+FftJob::~FftJob() {
+    release();
+}
+
+void FftJob::copy(FftJob& other) {
+    for (int i = 0; i < _size; ++i) {
+        _data[i] = other._data[i];
+    }    
+}
+
+double FftJob::rms(FftJob& inverse) {
+    
+    double rms = 0;
+    
+    for (int i = 0; i < _size; ++i) {
+        rms += pow(inverse.at(i) - at(i), 2);
+    }
+    rms /= size();
+    rms = sqrt(rms);
+    return rms;
+}
+
+double FftJob::signal_to_quant_error(FftJob& inverse) {
+    
+    return 10.0 * log10( signal_energy() / quant_error_energy(inverse) );
+}
+
+double FftJob::signal_energy() {
+    double energy = 0;
+    for (int i = 0; i < _size; ++i) {
+        energy += pow(at(i), 2);
+    }
+    return energy;
+}
+
+double FftJob::quant_error_energy(FftJob& inverse) {
+    
+    double energy = 0;
+    for (int i = 0; i < _size; ++i) {
+        energy += pow(at(i) - inverse.at(i), 2);
+    }
+    return energy;
+}
+
+void FftJob::populate(Fft::TestData data_type, double mean, double std) {
+    switch (data_type) {
+    case Fft::PERIODIC:
+    default:
+        periodic();
+        break;
+    case Fft::RANDOM:
+        randomize(mean, std);
+        break;
+    }
+}
+
+void FftJob::randomize(double mean, double std) {
+    
+    std::default_random_engine       generator(std::random_device{}());
+    std::normal_distribution<double> distribution(mean, std);
+    
+    srand(time(NULL));
+
+    for(int i = 0; i < _size; i++) {
+        double number = distribution(generator);
+        _data[i]  = number;
+    }
+}
+
+void FftJob::periodic() {
+    for (int i = 0; i < _size; ++i) {
+        double t = i * .002;
+        double amp = sin(2 * M_PI * t) + 1; 
+        _data[i] = amp;
+    }
+}
+
+void FftJob::scale(double factor) {
+    for (int i = 0; i < _size; ++i) {
+        _data[i] *= factor;
+    }
+}
+
+void FftJob::write(std::string filename) {
+    std::ofstream ofs;
+    ofs.open(filename);
+    
+    for (int i = 0; i < _size; ++i) {
+        ofs << _data[i] << std::endl;
+    }
+    
+    ofs.close();   
+}
+
+void FftJob::write_hermitian(std::string filename) {
+    std::ofstream ofs;
+    ofs.open(filename);
+    
+    for (int i = 0; i < _size / 2; ++i) {
+        auto real = at_hr(i);
+        auto imag = at_hi(i);
+        auto amplitude = sqrt(pow(real, 2) + pow(imag, 2));
+        auto phase = atan2(imag, real);
+        ofs << real << ", " << imag << ", " << amplitude << ", " << phase << std::endl;
+    }
+    
+    ofs.close();   
+}
+
+void FftJob::release() {
+    if (NULL != _data) {
+        delete[] _data;
+        _data = NULL;
+    }
+}

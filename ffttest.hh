@@ -5,25 +5,24 @@
 
 class FftTest : public FftCallback {
 public:
-    FftTest(size_t          fft_size, 
-            Fft::Device     device_type, 
-            long            count, 
-            int             parallel, 
-            Fft::TestData   test_data, 
-            double          mean, 
-            double          std);
+    FftTest();
 
 public:
-    void init();
+    void init(size_t          fft_size, 
+              Fft::Device     device_type, 
+              long            count, 
+               int            parallel, 
+              Fft::TestData   test_data, 
+              double          mean, 
+              double          std);
     void test();
     void release();     
 
 public:
-    virtual void fft_complete();
+    virtual void fft_complete(FftJob* job);
     
 private:
-    Fft     _fft;
-    bool    _is_init;
+    Fft*    _fft;
 };
 
 #endif // __ffttest_hh
