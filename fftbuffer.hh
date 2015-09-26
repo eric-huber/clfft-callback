@@ -9,6 +9,7 @@ class Fft;
 class FftBuffer {
 public: 
     enum TestData  {PERIODIC, RANDOM};
+    enum Contains  {DATA, FFT, IFFT};
 
 public:
     FftBuffer(Fft* fft, size_t size, cl_mem local);
@@ -42,6 +43,9 @@ public:
     
     Fft*        fft()               { return _fft; }
 
+    void        contains(Contains contains)     { _contains = contains; }
+    Contains    contains()                      { return _contains; }
+    
 private:
     void        randomize(double mean, double std);
     void        periodic();
@@ -54,6 +58,8 @@ private:
     size_t      _size;
     cl_mem      _local;
     cl_float*   _data;
+    
+    Contains    _contains;
 };
 
 #endif // __fftbuffer_hh

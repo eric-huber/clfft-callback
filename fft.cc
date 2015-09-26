@@ -109,6 +109,7 @@ bool Fft::forward(FftBuffer* buffer) {
                                buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
+    buffer->contains(FftBuffer::FFT);
     clSetEventCallback(read, CL_COMPLETE, &event_callback, buffer);
 
     return true;
@@ -136,6 +137,7 @@ bool Fft::backward(FftBuffer* buffer) {
                                buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
+    buffer->contains(FftBuffer::IFFT);
     clSetEventCallback(read, CL_COMPLETE, &event_callback, buffer);
 
     return true;

@@ -41,6 +41,14 @@ void FftTest::release() {
 }
 
 void FftTest::fft_complete(FftBuffer* buffer) {
-	
-	buffer->write_hermitian(_fft_file_name);
+
+    switch (buffer->contains()) {
+    case FftBuffer::FFT:
+        buffer->write_hermitian(_fft_file_name);
+        _fft->backward(buffer);
+        break;
+    case FftBuffer::IFFT:
+        buffer->write(_bak_file_name);
+        break;
+    }
 }
