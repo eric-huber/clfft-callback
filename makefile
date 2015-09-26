@@ -5,9 +5,9 @@ LDFLAGS  += -lboost_program_options
 LDFLAGS  += -lclFFT -L/opt/intel/opencl -lm -lOpenCL 
 
 PROG=clfft-callback
-OBJS=fft.o     \
-     fftjob.o  \
-     ffttest.o \
+OBJS=fft.o        \
+     fftbuffer.o  \
+     ffttest.o    \
      main.o
 
 .PHONY: all clean

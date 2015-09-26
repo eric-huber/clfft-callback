@@ -1,22 +1,27 @@
+#ifndef __fftbuffer_hh
+#define __fftbuffer_hh
+
 #include <clFFT.h>
 #include <string>
 
-#include "fft.hh"
+class Fft;
 
-class FftJob {
-  
+class FftBuffer {
+public: 
+    enum TestData  {PERIODIC, RANDOM};
+
 public:
-    FftJob(size_t fft_size);
-    ~FftJob();
+    FftBuffer(Fft* fft, size_t size, cl_mem local);
+    ~FftBuffer();
     
 public:    
-    void        populate(Fft::TestData data_type, double mean, double std);
+    void        populate(TestData data_type, double mean, double std);
     void        scale(double factor);
 
-    void        copy(FftJob& other);
+    void        copy(FftBuffer& other);
     
-    double      rms(FftJob& inverse);    
-    double      signal_to_quant_error(FftJob& inverse);
+    double      rms(FftBuffer& inverse);    
+    double      signal_to_quant_error(FftBuffer& inverse);
 
     void        write(std::string file);
     void        write_hermitian(std::string file);
@@ -32,14 +37,23 @@ public:
     int         size()              { return _size; }
     int         size_h()            { return _size / 2; }
 
+    cl_mem      local()             { return _local; }
+    cl_mem*     local_addr()        { return &_local;}
+    
+    Fft*        fft()               { return _fft; }
+
 private:
     void        randomize(double mean, double std);
     void        periodic();
     
     double      signal_energy();
-    double      quant_error_energy(FftJob& inverse);  
+    double      quant_error_energy(FftBuffer& inverse);  
 
 private:
+    Fft*        _fft;
     size_t      _size;
+    cl_mem      _local;
     cl_float*   _data;
 };
+
+#endif // __fftbuffer_hh

@@ -5,32 +5,32 @@
 #include <vector>
 
 #include "fftcallback.hh"
+#include "fftbuffer.hh"
 
 class Fft {
     
 public:
     enum Device    {GPU, CPU};
-	enum TestData  {PERIODIC, RANDOM};
 
 public:
     Fft(size_t       fft_size, 
         Device       device_type, 
         long         count, 
-        int          parallel, 
-        TestData     test_data, 
-        double       mean, 
-        double       std);
+        int          parallel);
 
 	virtual ~Fft();
 
-    bool init();
-    void release();
+    bool         init();
+    void         release();
 
     // we can only accept one callback at the moment
-    void register_callback(FftCallback* callback);
+    void         register_callback(FftCallback* callback) { _callback = callback; }
+    FftCallback* get_callback()                           { return _callback; }
 
-    bool forward(FftJob* job);
-    bool backward(FftJob* job);
+    FftBuffer*   get_buffer();
+
+    bool         forward(FftBuffer* job);
+    bool         backward(FftBuffer* job);
 
 private:
     bool select_platform();
@@ -39,15 +39,14 @@ private:
     bool setup_forward();
     bool setup_backward();
     bool setup_buffers();
+    
+    size_t  buffer_size();
 
 private:
     size_t                  _fft_size;
     Device                  _device_type; 
     long                    _count;
     int                     _parallel;
-    TestData                _test_data; 
-    double                  _mean;
-    double                  _std;
     
     cl_platform_id          _platform;
     cl_device_id            _device;
@@ -55,6 +54,10 @@ private:
     cl_command_queue        _queue;
     clfftPlanHandle         _forward;
     clfftPlanHandle         _backward;
+    
+    FftCallback*            _callback;
+    
+    std::vector<FftBuffer*> _buffers;
 };
 
 #endif // __fft_hh

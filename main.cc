@@ -15,7 +15,7 @@ int main(int ac, char* av[]) {
 
     size_t              fft_size        = 8192;
     Fft::Device         device          = Fft::GPU;
-    Fft::TestData       test_data       = Fft::RANDOM;
+    FftBuffer::TestData test_data       = FftBuffer::RANDOM;
     int                 parallel        = 16;
     long                count           = 1000;
     double              mean            = 0.5;
@@ -53,11 +53,11 @@ int main(int ac, char* av[]) {
         }
                 
         if (vm.count("periodic")) {
-        	test_data = Fft::PERIODIC;
+        	test_data = FftBuffer::PERIODIC;
         }
         
         if (vm.count("random")) {
-        	test_data = Fft::RANDOM;
+        	test_data = FftBuffer::RANDOM;
         }
         
         if (vm.count("mean")) {
@@ -93,7 +93,10 @@ int main(int ac, char* av[]) {
 
     // test it
     FftTest test;
-    test.init(fft_size, device, count, parallel, test_data, mean, std);
+    if (!test.init(fft_size, device, count, parallel, test_data, mean, std)) {
+    	std::cout << "Unable to initialize OpenCL." << std::endl;
+    	return 2;
+    }
     test.test();
     test.release();
     

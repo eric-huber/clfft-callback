@@ -8,21 +8,25 @@ public:
     FftTest();
 
 public:
-    void init(size_t          fft_size, 
-              Fft::Device     device_type, 
-              long            count, 
-               int            parallel, 
-              Fft::TestData   test_data, 
-              double          mean, 
-              double          std);
+    bool init(size_t                fft_size, 
+              Fft::Device           device_type, 
+              long                  count, 
+              int                   parallel, 
+              FftBuffer::TestData   test_data, 
+              double                mean, 
+              double                std);
     void test();
     void release();     
 
 public:
-    virtual void fft_complete(FftJob* job);
+    virtual void fft_complete(FftBuffer* job);
     
 private:
-    Fft*    _fft;
+    Fft*                _fft;
+    
+    FftBuffer::TestData _test_data; 
+    double              _mean; 
+    double              _std;
 };
 
 #endif // __ffttest_hh

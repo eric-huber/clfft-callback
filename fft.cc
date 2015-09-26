@@ -10,33 +10,26 @@
           << " (" << err << ")" << std::endl;   \
       return false;                             \
     }
-    
-FftCallback*    callback;
 
 void CL_CALLBACK event_callback(cl_event event, cl_int status, void* user_data) {
         
     if (CL_COMPLETE != status) {
         return;
     }
-    
-    FftJob* job = (FftJob*) user_data;   
-    callback->fft_complete(job);    
+
+    FftBuffer* buffer = (FftBuffer*) user_data;
+    Fft* fft = buffer->fft();
+    fft->get_callback()->fft_complete(buffer);    
 }
 
 Fft::Fft(size_t   fft_size, 
                Device   device, 
                long     count, 
-               int      parallel, 
-               TestData test_data, 
-               double   mean, 
-               double   std) 
+               int      parallel) 
  :  _fft_size       (fft_size),
     _device_type    (device),
     _count          (count),
-    _parallel       (parallel),
-    _test_data      (test_data),
-    _mean           (mean),
-    _std            (std)
+    _parallel       (parallel)
  {
  }
 
@@ -70,12 +63,30 @@ void Fft::release() {
     _context = NULL;
 }
 
-void Fft::register_callback(FftCallback* cb) {
-    callback = callback;
+FftBuffer* Fft::get_buffer() {
+    
+    if (_parallel <= _buffers.size())
+        return NULL;
+    
+    cl_int err = 0;
+
+    // allocate local buffer
+    cl_mem buf = clCreateBuffer(_context, CL_MEM_READ_WRITE, 
+                                buffer_size(), NULL, &err);
+    if (err != CL_SUCCESS) {
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << " Unexpected result for clCreateBuffer (" << err << ")" << std::endl;
+        return NULL;
+    }
+
+    // add to list
+    FftBuffer* buffer = new FftBuffer(this, buffer_size(), buf);
+    _buffers.push_back(buffer);
+    
+    return buffer;
 }
 
-
-bool Fft::forward(FftJob* job) {
+bool Fft::forward(FftBuffer* buffer) {
     
     cl_int err = 0;
    
@@ -83,58 +94,51 @@ bool Fft::forward(FftJob* job) {
     cl_event read = 0;
     cl_event transform = 0;
 
-    // get buffer
-    
-/*
-    // Enqueue write tab array into _local_buffers[0]
-    err = clEnqueueWriteBuffer(_queue, buffer->data(), CL_FALSE, 0, 
-                                buffer->size(), job->data(), 0, NULL, &write);
+    // Enqueue the data write
+    err = clEnqueueWriteBuffer(_queue, buffer->local(), CL_FALSE, 0, 
+                                buffer->size(), buffer->data(), 0, NULL, &write);
     CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
     err = clfftEnqueueTransform(_forward, CLFFT_FORWARD, 1, &_queue, 1, &write, &transform,
-                                 buffer->data_addr(), NULL, buffer->temp());
+                                 buffer->local_addr(), NULL, NULL); //buffer->temp());
     CHECK("clEnqueueTransform");
 
-    // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, buffer->data(), CL_FALSE, 0,
-                               buffer->size(), job->data(), 1, &transform, &read);
+    // Read the results back
+    err = clEnqueueReadBuffer(_queue, buffer->local(), CL_FALSE, 0,
+                               buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
     clSetEventCallback(read, CL_COMPLETE, &event_callback, buffer);
-*/
+
     return true;
 }
 
-bool Fft::backward(FftJob* job) {
+bool Fft::backward(FftBuffer* buffer) {
     cl_int err = 0;
    
     cl_event write = 0;
     cl_event read = 0;
     cl_event transform = 0;
 
-    // get buffer
-    
-/*
-    // Enqueue write tab array into _local_buffers[0]
-    err = clEnqueueWriteBuffer(_queue, buffer->data(), CL_FALSE, 0, 
-                                buffer->size(), job->data(), 0, NULL, &write);
+    // Enqueue the data write
+    err = clEnqueueWriteBuffer(_queue, buffer->local(), CL_FALSE, 0, 
+                                buffer->size(), buffer->data(), 0, NULL, &write);
     CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
     err = clfftEnqueueTransform(_backward, CLFFT_BACKWARD, 1, &_queue, 1, &write, &transform,
-                                 buffer->data_addr(), NULL, buffer->temp());
+                                 buffer->local_addr(), NULL, NULL); //buffer->temp());
     CHECK("clEnqueueTransform");
 
-    // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, buffer->data(), CL_FALSE, 0,
-                               buffer->size(), job->data(), 1, &transform, &read);
+    // Read the results back
+    err = clEnqueueReadBuffer(_queue, buffer->local(), CL_FALSE, 0,
+                               buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
     clSetEventCallback(read, CL_COMPLETE, &event_callback, buffer);
-*/
-    return true;
 
+    return true;
 }
 
 bool Fft::select_platform() {
@@ -250,4 +254,8 @@ bool Fft::setup_backward() {
     CHECK("clfftBakePlan");
 
     return true;
+}
+
+size_t Fft::buffer_size() {
+    return sizeof(cl_float) * _fft_size;
 }
