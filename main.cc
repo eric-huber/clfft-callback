@@ -88,9 +88,6 @@ int main(int ac, char* av[]) {
         return 1;
     }
 
-    // to nearest 16
-    count = ((int) ceil(count / parallel)) * parallel;
-
     // test it
     FftTest test;
     if (!test.init(fft_size, device, count, parallel, test_data, mean, std)) {

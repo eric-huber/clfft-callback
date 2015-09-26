@@ -15,10 +15,13 @@ public:
 public:
     Fft(size_t       fft_size, 
         Device       device_type, 
-        long         count, 
         int          parallel);
 
 	virtual ~Fft();
+	
+	size_t       get_size()     { return _fft_size; }
+	Device       get_device()   { return _device_type; }
+	int          get_parallel() { return _parallel; }
 
     bool         init();
     void         release();
@@ -45,7 +48,6 @@ private:
 private:
     size_t                  _fft_size;
     Device                  _device_type; 
-    long                    _count;
     int                     _parallel;
     
     cl_platform_id          _platform;

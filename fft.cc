@@ -24,11 +24,9 @@ void CL_CALLBACK event_callback(cl_event event, cl_int status, void* user_data) 
 
 Fft::Fft(size_t   fft_size, 
                Device   device, 
-               long     count, 
                int      parallel) 
  :  _fft_size       (fft_size),
     _device_type    (device),
-    _count          (count),
     _parallel       (parallel)
  {
  }
