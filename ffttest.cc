@@ -97,7 +97,7 @@ void FftTest::fft_complete(FftBuffer* buffer) {
         
         ++_total;
         if (_total < _count) {
-            buffer->populate(_test_data, _mean, _std);
+            //buffer->populate(_test_data, _mean, _std);
             _fft->forward(buffer);
         } else {
             done();
