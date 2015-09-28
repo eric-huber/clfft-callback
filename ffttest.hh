@@ -16,20 +16,21 @@ public:
     FftTest();
 
 public:
-    bool init(size_t                fft_size, 
-              Fft::Device           device_type,
-              bool                  use_out_of_order,
-              int                   queue_count,
-              long                  count, 
-              int                   parallel, 
-              FftBuffer::TestData   test_data, 
-              double                mean, 
-              double                std);
-    void test();
-    void release();
+    bool        init(size_t                fft_size, 
+                     Fft::Device           device_type,
+                     bool                  use_out_of_order,
+                     int                   queue_count,
+                     long                  count, 
+                     int                   parallel, 
+                     FftBuffer::TestData   test_data, 
+                     double                mean, 
+                     double                std);
     
-    void done();
-    void print_results(time_pt start, time_pt finish);
+    void        test();
+    void        release();
+    
+    FftBuffer*  get_complete_buffer();
+    void        print_results(time_pt start, time_pt finish);
 
 public:
     virtual void fft_complete(FftBuffer* job);
@@ -44,6 +45,8 @@ private:
     
     int                         _count;
     int                         _total;
+    
+    std::vector<FftBuffer*>     _buffers;
     
     std::mutex                  _mut;
     std::condition_variable     _cond;

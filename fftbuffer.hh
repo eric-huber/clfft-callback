@@ -1,6 +1,7 @@
 #ifndef __fftbuffer_hh
 #define __fftbuffer_hh
 
+#include <atomic>
 #include <clFFT.h>
 #include <string>
 
@@ -9,7 +10,7 @@ class Fft;
 class FftBuffer {
 public: 
     enum TestData  {PERIODIC, RANDOM};
-    enum Contains  {DATA, FFT, IFFT};
+    enum Contains  {DATA, FFT, IFFT, DONE};
 
 public:
     FftBuffer(Fft* fft, size_t size, cl_mem local);
@@ -42,9 +43,14 @@ public:
     cl_mem*     local_addr()        { return &_local;}
     
     Fft*        fft()               { return _fft; }
-
+    void        queue(int q)        { _queue = q; }
+    int         queue()             { return _queue; }    
+    
     void        contains(Contains contains)     { _contains = contains; }
     Contains    contains()                      { return _contains; }
+    
+    void        set_complete(bool is_complete)  { _is_complete = is_complete; }
+    bool        is_complete()                   { return _is_complete; }
     
 private:
     void        randomize(double mean, double std);
@@ -55,11 +61,13 @@ private:
 
 private:
     Fft*        _fft;
+    int         _queue;
     size_t      _size;
     cl_mem      _local;
     cl_float*   _data;
     
-    Contains    _contains;
+    Contains            _contains;
+    std::atomic_bool    _is_complete;
 };
 
 #endif // __fftbuffer_hh

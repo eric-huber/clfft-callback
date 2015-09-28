@@ -12,7 +12,7 @@ FftTest::FftTest()
 {	
 }
 
-bool ready = false;
+std::atomic_bool ready;
 
 bool FftTest::init(size_t               fft_size, 
                    Fft::Device          device,
@@ -40,32 +40,59 @@ void FftTest::test() {
 
     _fft->register_callback(this);
 
-    time_pt start = std::chrono::high_resolution_clock::now();
-    
+    // start initial transforms    
     for (int i = 0; i < _fft->get_parallel(); ++i) {
         FftBuffer* buffer = _fft->get_buffer();
         buffer->populate(_test_data, _mean, _std);
+        _buffers.push_back(buffer);
     
         _fft->forward(buffer);
     }
     
-    _cond.wait(lock, []{ return ready; });
+    time_pt start = std::chrono::high_resolution_clock::now();
+    
+    while (_total < _count) {
+        _cond.wait(lock, []{ return ready.load(); });
+    
+        FftBuffer* buffer = get_complete_buffer();
+        if (NULL == buffer)
+            continue;
+
+        buffer->set_complete(false);
+        switch (buffer->contains()) {
+        case FftBuffer::FFT:
+            _fft->backward(buffer);
+            break;
+     
+        case FftBuffer::IFFT:
+            if (_save_data)
+                buffer->write(_bak_file_name);
+            
+            ++_total;
+            if (_total < _count) {
+                //buffer->populate(_test_data, _mean, _std);
+                _fft->forward(buffer);
+            }
+            break;
+        }
+    }
     
     time_pt end = std::chrono::high_resolution_clock::now();
     
-    print_results(start, end);    
+    print_results(start, end);
 }
 
 void FftTest::release() {
     _fft->release();
 }
 
-void FftTest::done() {
-    
-    ready = true;
-    _cond.notify_one();
+FftBuffer* FftTest::get_complete_buffer() {
+    for (auto buffer : _buffers) {
+        if (buffer->is_complete())
+            return buffer;
+    }
+    return NULL;
 }
-
 void FftTest::print_results(time_pt start, time_pt finish) {
     
     std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start);
@@ -88,22 +115,10 @@ void FftTest::print_results(time_pt start, time_pt finish) {
 
 void FftTest::fft_complete(FftBuffer* buffer) {
 
-    switch (buffer->contains()) {
-    case FftBuffer::FFT:
-        _fft->backward(buffer);
-        break;
- 
-    case FftBuffer::IFFT:
-        if (_save_data)
-            buffer->write(_bak_file_name);
-        
-        ++_total;
-        if (_total < _count) {
-            //buffer->populate(_test_data, _mean, _std);
-            _fft->forward(buffer);
-        } else {
-            done();
-        }
-        break;
-    }
+    // mark this data set as done
+    buffer->set_complete(true);
+    
+    // wake the main thread
+    ready = true;
+    _cond.notify_one();
 }

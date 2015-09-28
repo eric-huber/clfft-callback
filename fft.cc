@@ -66,32 +66,6 @@ void Fft::release() {
     _context = NULL;
 }
 
-FftBuffer* Fft::get_buffer() {
-    
-    if (_parallel <= _buffers.size())
-        return NULL;
-    
-    cl_int err = 0;
-
-    // allocate local buffer
-    cl_mem buf = clCreateBuffer(_context, CL_MEM_READ_WRITE, 
-                                buffer_size(), NULL, &err);
-    if (err != CL_SUCCESS) {
-        std::cerr << __FILE__ << ":" << __LINE__
-                  << " Unexpected result for clCreateBuffer (" << err << ")" << std::endl;
-        return NULL;
-    }
-
-    int queue = _buffers.size() % _queue_count;
-    
-    // add to list
-    FftBuffer* buffer = new FftBuffer(this, buffer_size(), buf);
-    buffer->queue(queue);
-    _buffers.push_back(buffer);
-    
-    return buffer;
-}
-
 bool Fft::forward(FftBuffer* buffer) {
     
     cl_int err = 0;
@@ -283,6 +257,32 @@ bool Fft::setup_backward() {
     }
 
     return true;
+}
+
+FftBuffer* Fft::get_buffer() {
+    
+    if (_parallel <= _buffers.size())
+        return NULL;
+    
+    cl_int err = 0;
+
+    // allocate local buffer
+    cl_mem buf = clCreateBuffer(_context, CL_MEM_READ_WRITE, 
+                                buffer_size(), NULL, &err);
+    if (err != CL_SUCCESS) {
+        std::cerr << __FILE__ << ":" << __LINE__
+                  << " Unexpected result for clCreateBuffer (" << err << ")" << std::endl;
+        return NULL;
+    }
+
+    int queue = _buffers.size() % _queue_count;
+
+    // add to list
+    FftBuffer* buffer = new FftBuffer(this, buffer_size(), buf);
+    buffer->queue(queue);
+    _buffers.push_back(buffer);
+
+    return buffer;
 }
 
 size_t Fft::buffer_size() {
