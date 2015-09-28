@@ -23,11 +23,15 @@ void CL_CALLBACK event_callback(cl_event event, cl_int status, void* user_data) 
 }
 
 Fft::Fft(size_t   fft_size, 
-               Device   device, 
+               Device   device,
+               bool     use_out_of_order,
+               int      queue_count,
                int      parallel) 
- :  _fft_size       (fft_size),
-    _device_type    (device),
-    _parallel       (parallel)
+ :  _fft_size(fft_size),
+    _device_type(device),
+    _use_out_of_order(use_out_of_order),
+    _queue_count(queue_count),
+    _parallel(parallel)
  {
  }
 
@@ -53,9 +57,10 @@ void Fft::release() {
     // Release clFFT library. 
     clfftTeardown();
     
-    // Release OpenCL working objects. 
-    clReleaseCommandQueue(_queue);
-    _queue = NULL;
+    // Release OpenCL working objects.
+    for (auto queue : _queues)
+        clReleaseCommandQueue(queue);
+    _queues.empty();
     
     clReleaseContext(_context);
     _context = NULL;
@@ -77,8 +82,11 @@ FftBuffer* Fft::get_buffer() {
         return NULL;
     }
 
+    int queue = _buffers.size() % _queue_count;
+    
     // add to list
     FftBuffer* buffer = new FftBuffer(this, buffer_size(), buf);
+    buffer->queue(queue);
     _buffers.push_back(buffer);
     
     return buffer;
@@ -91,19 +99,21 @@ bool Fft::forward(FftBuffer* buffer) {
     cl_event write = 0;
     cl_event read = 0;
     cl_event transform = 0;
-
+    
+    int queue = buffer->queue();
+    
     // Enqueue the data write
-    err = clEnqueueWriteBuffer(_queue, buffer->local(), CL_FALSE, 0, 
+    err = clEnqueueWriteBuffer(_queues[queue], buffer->local(), CL_FALSE, 0, 
                                 buffer->size(), buffer->data(), 0, NULL, &write);
     CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
-    err = clfftEnqueueTransform(_forward, CLFFT_FORWARD, 1, &_queue, 1, &write, &transform,
+    err = clfftEnqueueTransform(_forward[queue], CLFFT_FORWARD, 1, &_queues[queue], 1, &write, &transform,
                                  buffer->local_addr(), NULL, NULL); //buffer->temp());
     CHECK("clEnqueueTransform");
 
     // Read the results back
-    err = clEnqueueReadBuffer(_queue, buffer->local(), CL_FALSE, 0,
+    err = clEnqueueReadBuffer(_queues[queue], buffer->local(), CL_FALSE, 0,
                                buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
@@ -120,18 +130,20 @@ bool Fft::backward(FftBuffer* buffer) {
     cl_event read = 0;
     cl_event transform = 0;
 
+    int queue = 0;
+    
     // Enqueue the data write
-    err = clEnqueueWriteBuffer(_queue, buffer->local(), CL_FALSE, 0, 
+    err = clEnqueueWriteBuffer(_queues[queue], buffer->local(), CL_FALSE, 0, 
                                 buffer->size(), buffer->data(), 0, NULL, &write);
     CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
-    err = clfftEnqueueTransform(_backward, CLFFT_BACKWARD, 1, &_queue, 1, &write, &transform,
+    err = clfftEnqueueTransform(_backward[queue], CLFFT_BACKWARD, 1, &_queues[queue], 1, &write, &transform,
                                  buffer->local_addr(), NULL, NULL); //buffer->temp());
     CHECK("clEnqueueTransform");
 
     // Read the results back
-    err = clEnqueueReadBuffer(_queue, buffer->local(), CL_FALSE, 0,
+    err = clEnqueueReadBuffer(_queues[queue], buffer->local(), CL_FALSE, 0,
                                buffer->size(), buffer->data(), 1, &transform, &read);
     CHECK("clEnqueueReadBuffer");
 
@@ -184,8 +196,14 @@ bool Fft::setup_cl() {
     _context = clCreateContext(props, 1, &_device, NULL, NULL, &err);
     CHECK("clCreateContext");
 
+    
+    
     // Setup queues
-    _queue = clCreateCommandQueue(_context, _device, 0 /* IN-ORDER */, &err);
+    for (int i = 0; i < _queue_count; ++i) {
+        cl_command_queue queue = clCreateCommandQueue(_context, _device, 
+            (_use_out_of_order ? CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE : 0), &err);
+        _queues.push_back(queue);
+    }
     CHECK("clCreateCommandQueue CPU");
 
     return true;
@@ -206,26 +224,31 @@ bool Fft::setup_clFft() {
 
 bool Fft::setup_forward() {
     cl_int err = 0;
-    
-    // Size of FFT 
-    size_t clLengths = _fft_size;
-    clfftDim dim = CLFFT_1D;
-    
-    // Create a default plan for a complex FFT 
-    err = clfftCreateDefaultPlan(&_forward, _context, dim, &clLengths);
-    CHECK("clfftCreateDefaultPlan");
 
-    // Set plan parameters
-    err = clfftSetPlanPrecision(_forward, CLFFT_SINGLE);
-    CHECK("clfftSetPlanPrecision");
-    err = clfftSetLayout(_forward, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
-    CHECK("clfftSetLayout");
-    err = clfftSetResultLocation(_forward, CLFFT_INPLACE);
-    CHECK("clfftSetResultLocation");
+    for (int i = 0; i < _queue_count; ++i) {
+        // Size of FFT 
+        size_t clLengths = _fft_size;
+        clfftDim dim = CLFFT_1D;
+        clfftPlanHandle forward;
+    
+        // Create a default plan for a complex FFT 
+        err = clfftCreateDefaultPlan(&forward, _context, dim, &clLengths);
+        CHECK("clfftCreateDefaultPlan");
 
-    // Bake the plan
-    err = clfftBakePlan(_forward, 1, &_queue, NULL, NULL);
-    CHECK("clfftBakePlan");
+        // Set plan parameters
+        err = clfftSetPlanPrecision(forward, CLFFT_SINGLE);
+        CHECK("clfftSetPlanPrecision");
+        err = clfftSetLayout(forward, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
+        CHECK("clfftSetLayout");
+        err = clfftSetResultLocation(forward, CLFFT_INPLACE);
+        CHECK("clfftSetResultLocation");
+
+        // Bake the plan
+        err = clfftBakePlan(forward, 1, &_queues[i], NULL, NULL);
+        CHECK("clfftBakePlan");
+        
+        _forward.push_back(forward);
+    }
 
     return true;
 }
@@ -233,25 +256,31 @@ bool Fft::setup_forward() {
 bool Fft::setup_backward() {
     cl_int err = 0;
 
-    // Size of FFT
-    size_t clLengths = _fft_size;
-    clfftDim dim = CLFFT_1D;
-    
-    // Create a default plan for a complex FFT 
-    err = clfftCreateDefaultPlan(&_backward, _context, dim, &clLengths);
-    CHECK("clfftCreateDefaultPlan");
+    for (int i = 0; i < _queue_count; ++i) {
+        // Size of FFT
+        size_t clLengths = _fft_size;
+        clfftDim dim = CLFFT_1D;
+        clfftPlanHandle backward;
+        
+        // Create a default plan for a complex FFT 
+        err = clfftCreateDefaultPlan(&backward, _context, dim, &clLengths);
+        CHECK("clfftCreateDefaultPlan");
 
-    // Set plan parameters
-    err = clfftSetPlanPrecision(_backward, CLFFT_SINGLE);
-    CHECK("clfftSetPlanPrecision");
-    err = clfftSetLayout(_backward, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
-    CHECK("clfftSetLayout");
-    err = clfftSetResultLocation(_backward, CLFFT_INPLACE);
-    CHECK("clfftSetResultLocation");
+        // Set plan parameters
+        err = clfftSetPlanPrecision(backward, CLFFT_SINGLE);
+        CHECK("clfftSetPlanPrecision");
+        err = clfftSetLayout(backward, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
+        CHECK("clfftSetLayout");
+        err = clfftSetResultLocation(backward, CLFFT_INPLACE);
+        CHECK("clfftSetResultLocation");
 
-    // Bake the plan
-    err = clfftBakePlan(_backward, 1, &_queue, NULL, NULL);
-    CHECK("clfftBakePlan");
+        // Bake the plan
+
+        err = clfftBakePlan(backward, 1, &_queues[i], NULL, NULL);
+        CHECK("clfftBakePlan");
+        
+        _backward.push_back(backward);
+    }
 
     return true;
 }

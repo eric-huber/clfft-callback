@@ -17,7 +17,9 @@ public:
 
 public:
     bool init(size_t                fft_size, 
-              Fft::Device           device_type, 
+              Fft::Device           device_type,
+              bool                  use_out_of_order,
+              int                   queue_count,
               long                  count, 
               int                   parallel, 
               FftBuffer::TestData   test_data, 

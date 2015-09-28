@@ -8,13 +8,14 @@
 #include "fftbuffer.hh"
 
 class Fft {
-    
 public:
     enum Device    {GPU, CPU};
 
 public:
     Fft(size_t       fft_size, 
-        Device       device_type, 
+        Device       device_type,
+        bool         use_out_of_order,
+        int          queue_count,
         int          parallel);
 
 	virtual ~Fft();
@@ -46,20 +47,21 @@ private:
     size_t  buffer_size();
 
 private:
-    size_t                  _fft_size;
-    Device                  _device_type; 
-    int                     _parallel;
+    size_t                         _fft_size;
+    Device                         _device_type;
+    bool                           _use_out_of_order;
+    int                            _queue_count;
+    int                            _parallel;
     
-    cl_platform_id          _platform;
-    cl_device_id            _device;
-    cl_context              _context;
-    cl_command_queue        _queue;
-    clfftPlanHandle         _forward;
-    clfftPlanHandle         _backward;
+    cl_platform_id                 _platform;
+    cl_device_id                   _device;
+    cl_context                     _context;
+    std::vector<cl_command_queue>  _queues;
+    std::vector<clfftPlanHandle>   _forward;
+    std::vector<clfftPlanHandle>   _backward;
+    std::vector<FftBuffer*>        _buffers;
     
-    FftCallback*            _callback;
-    
-    std::vector<FftBuffer*> _buffers;
+    FftCallback*                   _callback;
 };
 
 #endif // __fft_hh

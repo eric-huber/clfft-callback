@@ -15,7 +15,9 @@ FftTest::FftTest()
 bool ready = false;
 
 bool FftTest::init(size_t               fft_size, 
-                   Fft::Device          device, 
+                   Fft::Device          device,
+                   bool                 use_out_of_order,
+                   int                  queue_count,
                    long                 count, 
                    int                  parallel, 
                    FftBuffer::TestData  test_data, 
@@ -28,7 +30,7 @@ bool FftTest::init(size_t               fft_size,
     _std = std;
     ready = false;
     
-    _fft = new Fft(fft_size, device, parallel);
+    _fft = new Fft(fft_size, device, use_out_of_order, queue_count, parallel);
     return _fft->init();
 }
 
