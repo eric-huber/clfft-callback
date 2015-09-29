@@ -40,7 +40,7 @@ int main(int ac, char* av[]) {
         ("mean,m",         po::value<double>(), "Mean for random data")
         ("deviation,d",    po::value<double>(), "Standard deviation for random data")
         
-        ("jobs,j",         po::value<int>(), "Jobs to perform in parallel")
+        ("buffers,b",      po::value<int>(), "Buffers for parallel processing")
         ("loops,l",        po::value<long>(), "Set the number of iterations to perform");        
 
         po::variables_map vm;
@@ -80,8 +80,8 @@ int main(int ac, char* av[]) {
             std = vm["deviation"].as<double>();
         }
         
-        if (vm.count("jobs")) {
-            parallel = vm["jobs"].as<int>();
+        if (vm.count("buffers")) {
+            parallel = vm["buffers"].as<int>();
         }
 
         if (vm.count("loops")) {
