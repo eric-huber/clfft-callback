@@ -11,7 +11,9 @@
 FftBuffer::FftBuffer(Fft* fft, size_t size, cl_mem local) 
  : _fft(fft),
    _size(size),
-   _local(local)
+   _local(local),
+   _duration(0),
+   _transforms(0)
 {
     _data  = new cl_float[_size];
 }
@@ -100,6 +102,22 @@ void FftBuffer::scale(double factor) {
     for (int i = 0; i < _size; ++i) {
         _data[i] *= factor;
     }
+}
+
+void FftBuffer::start_timer() {
+    _start = std::chrono::high_resolution_clock::now();
+}
+
+void FftBuffer::end_timer() {
+    time_pt end = std::chrono::high_resolution_clock::now();
+    std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - _start);
+    
+    _duration += duration;
+    ++_transforms;
+}
+
+double FftBuffer::ave_time() {
+    return _duration.count() / (double) _transforms;
 }
 
 void FftBuffer::write(std::string filename) {

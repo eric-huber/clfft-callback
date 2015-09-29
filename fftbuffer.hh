@@ -2,8 +2,11 @@
 #define __fftbuffer_hh
 
 #include <atomic>
+#include <chrono>
 #include <clFFT.h>
 #include <string>
+
+typedef std::chrono::high_resolution_clock::time_point time_pt;
 
 class Fft;
 
@@ -46,6 +49,12 @@ public:
     void        queue(int q)        { _queue = q; }
     int         queue()             { return _queue; }    
     
+    void        start_timer();
+    void        end_timer();
+    long        total_time()                    { return _duration.count(); }
+    long        transforms()                    { return _transforms; }
+    double      ave_time();
+    
     void        contains(Contains contains)     { _contains = contains; }
     Contains    contains()                      { return _contains; }
     
@@ -66,8 +75,12 @@ private:
     cl_mem      _local;
     cl_float*   _data;
     
-    Contains            _contains;
-    std::atomic_bool    _is_complete;
+    time_pt                     _start;
+    std::chrono::nanoseconds    _duration;
+    long                        _transforms;
+    
+    Contains                    _contains;
+    std::atomic_bool            _is_complete;
 };
 
 #endif // __fftbuffer_hh

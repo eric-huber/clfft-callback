@@ -18,6 +18,8 @@ void CL_CALLBACK event_callback(cl_event event, cl_int status, void* user_data) 
     }
 
     FftBuffer* buffer = (FftBuffer*) user_data;
+    buffer->end_timer();
+    
     Fft* fft = buffer->fft();
     fft->get_callback()->fft_complete(buffer);    
 }
@@ -75,6 +77,8 @@ bool Fft::forward(FftBuffer* buffer) {
     cl_event transform = 0;
     
     int queue = buffer->queue();
+    
+    buffer->start_timer();
     
     // Enqueue the data write
     err = clEnqueueWriteBuffer(_queues[queue], buffer->local(), CL_FALSE, 0, 

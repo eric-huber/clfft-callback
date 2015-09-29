@@ -1,6 +1,7 @@
 #include "ffttest.hh"
 
 #include <iostream>
+#include <iomanip>
 
 const char* _data_file_name = "fft-data.txt";
 const char* _fft_file_name  = "fft-forward.txt";
@@ -49,8 +50,6 @@ void FftTest::test() {
         _fft->forward(buffer);
     }
     
-    time_pt start = std::chrono::high_resolution_clock::now();
-    
     while (_total < _count) {
         _cond.wait(lock, []{ return ready.load(); });
     
@@ -77,9 +76,7 @@ void FftTest::test() {
         }
     }
     
-    time_pt end = std::chrono::high_resolution_clock::now();
-    
-    print_results(start, end);
+    print_results();
 }
 
 void FftTest::release() {
@@ -93,12 +90,15 @@ FftBuffer* FftTest::get_complete_buffer() {
     }
     return NULL;
 }
-void FftTest::print_results(time_pt start, time_pt finish) {
-    
-    std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start);
-    float count   = _count * 2;
-    float ave_dur = duration.count() / count;
 
+void FftTest::print_results() {
+    
+    double total_dur = 0;
+    for (auto buffer : _buffers) {
+        total_dur += buffer->ave_time();
+    }
+    double ave_dur = total_dur / (double) _buffers.size();
+    
     std::cout << "Device:     " << ( Fft::GPU == _fft->get_device() ? "GPU" : "CPU") << std::endl;
     std::cout << "Parallel:   " << _fft->get_parallel() << std::endl;
     std::cout << "Iterations: " << _count << std::endl;
@@ -109,7 +109,16 @@ void FftTest::print_results(time_pt start, time_pt finish) {
         std::cout << "Std Dev:    " << _std << std::endl;
     }
     std::cout << std::endl;
-    std::cout << "Time:       " << duration.count() << " ns" << std::endl;
+    for (int i = 0; i < _buffers.size(); ++i) {
+        std::cout << "Buffer " << std::setw(2) << i;
+        std::cout << " time: " << std::setw(12) << _buffers[i]->total_time();
+        std::cout << " ns, count: " << std::setw(4) << _buffers[i]->transforms();
+        std::cout << ", ave: " << _buffers[i]->ave_time();
+        std::cout << " ns (" << (_buffers[i]->ave_time() / 1000.0) << " μs)";
+        std::cout << std::endl;    
+    }
+    std::cout << std::endl;
+    std::cout << "Time:       " << total_dur << " ns" << std::endl;
     std::cout << "Average:    " << ave_dur << " ns (" << (ave_dur / 1000.0) << " μs)" << std::endl;
 }
 

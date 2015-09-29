@@ -3,14 +3,10 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <chrono>
 
 #include "fft.hh"
 
 class FftTest : public FftCallback {
-
-public:
-    typedef std::chrono::high_resolution_clock::time_point time_pt;
 
 public:
     FftTest();
@@ -30,7 +26,7 @@ public:
     void        release();
     
     FftBuffer*  get_complete_buffer();
-    void        print_results(time_pt start, time_pt finish);
+    void        print_results();
 
 public:
     virtual void fft_complete(FftBuffer* job);
