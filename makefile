@@ -1,7 +1,7 @@
 CC=g++
 CXXFLAGS += -I /opt/intel/opencl/include
 CXXFLAGS += -std=c++11
-CXXFLAGS += -enable-checking -g -O0
+#CXXFLAGS += -enable-checking -g -O0
 LDFLAGS  += -lboost_program_options
 LDFLAGS  += -lclFFT -L/opt/intel/opencl -lm -lOpenCL 
 
